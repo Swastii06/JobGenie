@@ -7,9 +7,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-export const generateAIInsights = async (industry) => {
+export const generateAIInsights = async (
+  industry,
+  location,
+  experienceLevel
+) => {
   const prompt = `
-          Analyze the current state of the ${industry} industry and provide insights in ONLY the following JSON format without any additional notes or explanations:
+          Analyze the current state of the ${industry} industry for a ${experienceLevel} professional in ${location} and provide insights in ONLY the following JSON format without any additional notes or explanations:
           {
             "salaryRanges": [
               { "role": "string", "min": number, "max": number, "median": number, "location": "string" }
@@ -51,8 +55,11 @@ export async function getIndustryInsights() {
 
   // If no insights exist, generate them
   if (!user.industryInsight) {
-    const insights = await generateAIInsights(user.industry);
-
+    const insights = await generateAIInsights(
+      user.industry,
+      user.location, // e.g., "Bhubaneswar, India"
+      user.experienceLevel // e.g., "Mid-level"
+    );
     const industryInsight = await db.industryInsight.create({
       data: {
         industry: user.industry,

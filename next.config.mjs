@@ -3,11 +3,13 @@ const nextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "randomuser.me",
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**', // This allows any path from picsum.photos
       },
     ],
   },
 };
 
-export default nextConfig;
+export default nextConfig; // Corrected line
