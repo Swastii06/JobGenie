@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    serverActions: true, // This is the required part to fix the error
+  },
   images: {
     remotePatterns: [
       {
@@ -12,4 +15,4 @@ const nextConfig = {
   },
 };
 
-export default nextConfig; // Corrected line
+export default nextConfig;

@@ -7,37 +7,159 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-export const generateAIInsights = async (
-  industry,
-  location,
-  experienceLevel
-) => {
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+const lerp = (a, b, t) => a + (b - a) * t;
+
+const normalizeSalaryRanges = (ranges, experience, location) => {
+  const years = typeof experience === "number" ? experience : 0;
+  // Base brackets in USD per year
+  let bracket;
+  if (years <= 1) {
+    bracket = { minMin: 15000, minMax: 50000, medMin: 20000, medMax: 80000, maxMin: 30000, maxMax: 120000 };
+  } else if (years <= 3) {
+    bracket = { minMin: 30000, minMax: 70000, medMin: 50000, medMax: 100000, maxMin: 70000, maxMax: 150000 };
+  } else if (years <= 7) {
+    bracket = { minMin: 60000, minMax: 100000, medMin: 80000, medMax: 150000, maxMin: 120000, maxMax: 220000 };
+  } else {
+    bracket = { minMin: 90000, minMax: 150000, medMin: 120000, medMax: 220000, maxMin: 150000, maxMax: 350000 };
+  }
+
+  // Optional coarse adjustment by location
+  const loc = String(location || "").toLowerCase();
+  let multiplier = 1.0;
+  if (/(india|bangalore|bengaluru|mumbai|delhi|kolkata|hyderabad|pune|chennai)/.test(loc)) {
+    multiplier = 0.35; // general USD-equivalent band for India
+  } else if (/(europe|germany|france|spain|italy|poland|netherlands|sweden|norway|denmark|finland|uk|united kingdom)/.test(loc)) {
+    multiplier = 0.9;
+  } else if (/(canada|australia|new zealand)/.test(loc)) {
+    multiplier = 0.95;
+  } else if (/(usa|united states|us|san francisco|new york|seattle|boston|austin)/.test(loc)) {
+    multiplier = 1.1;
+  } else {
+    multiplier = 0.8;
+  }
+
+  const safeRanges = Array.isArray(ranges) ? ranges : [];
+  const n = safeRanges.length || 1;
+  // Rank roles by original median to preserve relative ordering
+  const indices = safeRanges
+    .map((r, i) => ({ i, med: Number(r.median ?? 0) }))
+    .sort((a, b) => a.med - b.med)
+    .map((x) => x.i);
+
+  return safeRanges.map((r, idx) => {
+    const originalMin = Number(r.min ?? 0);
+    const originalMed = Number(r.median ?? 0);
+    const originalMax = Number(r.max ?? 0);
+
+    const rank = Math.max(0, indices.indexOf(idx));
+    const t = n > 1 ? rank / (n - 1) : 0.5; // 0..1
+
+    // Base median distributed across the bracket by rank
+    const baseMedian = lerp(bracket.medMin, bracket.medMax, t);
+    const clampedOriginalMedian = originalMed > 0 ? clamp(originalMed, bracket.medMin, bracket.medMax) : baseMedian;
+    const preMultMedian = 0.6 * baseMedian + 0.4 * clampedOriginalMedian;
+
+    // Derive min/max around median with spreads
+    let preMultMin = clamp(preMultMedian * 0.72, bracket.minMin, bracket.minMax);
+    let preMultMax = clamp(preMultMedian * 1.28, bracket.maxMin, bracket.maxMax);
+
+    // Ensure ordering pre-multiplier
+    if (preMultMin > preMultMedian) preMultMin = clamp(preMultMedian * 0.9, bracket.minMin, bracket.minMax);
+    if (preMultMax < preMultMedian) preMultMax = clamp(preMultMedian * 1.1, bracket.maxMin, bracket.maxMax);
+
+    // Small jitter per role to avoid identical bars (±3%)
+    const jitterSeed = ((idx + 1) * 9301 + 49297) % 233280;
+    const jitter = ((jitterSeed / 233280) - 0.5) * 0.06; // -3%..+3%
+
+    let min = Math.round(preMultMin * multiplier * (1 + jitter));
+    let median = Math.round(preMultMedian * multiplier * (1 + jitter));
+    let max = Math.round(preMultMax * multiplier * (1 + jitter));
+
+    // Final ordering guard
+    if (median < min) median = min + 1000;
+    if (max < median) max = median + 1000;
+
+    return {
+      role: r.role || "Role",
+      location: r.location || location || "Global",
+      min,
+      median,
+      max,
+    };
+  });
+};
+
+export const generateAIInsights = async (industry, location, experience) => {
+  // Convert slug to a more readable industry name for the prompt, if needed
+  const readableIndustry = String(industry)
+    .replace(/-/g, " ")
+    .trim();
+  const readableLocation = String(location || "Global").trim();
+
+  const fallback = () => ({
+    salaryRanges: [
+      { role: "Junior Developer", min: 50000, max: 90000, median: 70000, location: readableLocation },
+      { role: "Mid-level Developer", min: 80000, max: 130000, median: 105000, location: readableLocation },
+      { role: "Senior Developer", min: 110000, max: 170000, median: 140000, location: readableLocation },
+      { role: "Product Manager", min: 100000, max: 160000, median: 130000, location: readableLocation },
+      { role: "Data Scientist", min: 100000, max: 170000, median: 135000, location: readableLocation },
+    ],
+    growthRate: 6.5,
+    demandLevel: "HIGH",
+    topSkills: ["JavaScript", "React", "Node.js", "SQL", "Cloud"],
+    marketOutlook: "POSITIVE",
+    keyTrends: [
+      "AI adoption",
+      "Cloud migration",
+      "Remote collaboration",
+      "Cybersecurity focus",
+      "Data-driven decisions",
+    ],
+    recommendedSkills: [
+      "TypeScript",
+      "AWS/GCP",
+      "Kubernetes",
+      "Prompt Engineering",
+      "System Design",
+    ],
+  });
+
   const prompt = `
-          Analyze the current state of the ${industry} industry for a ${experienceLevel} professional in ${location} and provide insights in ONLY the following JSON format without any additional notes or explanations:
-          {
-            "salaryRanges": [
-              { "role": "string", "min": number, "max": number, "median": number, "location": "string" }
-            ],
-            "growthRate": number,
-            "demandLevel": "HIGH" | "MEDIUM" | "LOW",
-            "topSkills": ["skill1", "skill2"],
-            "marketOutlook": "POSITIVE" | "NEUTRAL" | "NEGATIVE",
-            "keyTrends": ["trend1", "trend2"],
-            "recommendedSkills": ["skill1", "skill2"]
-          }
-          
-          IMPORTANT: Return ONLY the JSON. No additional text, notes, or markdown formatting.
-          Include at least 5 common roles for salary ranges.
-          Growth rate should be a percentage.
-          Include at least 5 skills and trends.
-        `;
+    Analyze the current state of the ${readableIndustry} industry in ${readableLocation} for a professional with approximately ${typeof experience === "number" ? experience : 0} years of experience, and provide insights in ONLY the following JSON format without any additional notes or explanations:
+    {
+      "salaryRanges": [
+        { "role": "string", "min": number, "max": number, "median": number, "location": "string" }
+      ],
+      "growthRate": number,
+      "demandLevel": "HIGH" | "MEDIUM" | "LOW",
+      "topSkills": ["skill1", "skill2"],
+      "marketOutlook": "POSITIVE" | "NEUTRAL" | "NEGATIVE",
+      "keyTrends": ["trend1", "trend2"],
+      "recommendedSkills": ["skill1", "skill2"]
+    }
+    
+    IMPORTANT: Return ONLY the JSON. No additional text, notes, or markdown formatting.
+    Include at least 5 common roles for salary ranges. Salaries must be realistic for the given location and experience level (avoid unrealistic values like $300k+ for entry-level).
+    Growth rate should be a percentage between 0 and 100.
+    Include at least 5 skills and trends.
+  `;
 
-  const result = await model.generateContent(prompt);
-  const response = result.response;
-  const text = response.text();
-  const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
-
-  return JSON.parse(cleanedText);
+  try {
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+    const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
+    const parsed = JSON.parse(cleanedText);
+    // Normalize salaries with guardrails
+    parsed.salaryRanges = normalizeSalaryRanges(parsed.salaryRanges, experience, location);
+    return parsed;
+  } catch (err) {
+    console.error("AI insights generation failed, using fallback:", err?.message || err);
+    const fb = fallback();
+    fb.salaryRanges = normalizeSalaryRanges(fb.salaryRanges, experience, location);
+    return fb;
+  }
 };
 
 export async function getIndustryInsights() {
@@ -53,17 +175,32 @@ export async function getIndustryInsights() {
 
   if (!user) throw new Error("User not found");
 
-  // If no insights exist, generate them
-  if (!user.industryInsight) {
+  // If no insights exist OR existing is a placeholder/incomplete, generate or refresh them
+  const shouldGenerate =
+    !user.industryInsight ||
+    !Array.isArray(user.industryInsight.salaryRanges) ||
+    user.industryInsight.salaryRanges.length === 0 ||
+    typeof user.industryInsight.growthRate !== "number" ||
+    user.industryInsight.growthRate <= 0;
+
+  if (shouldGenerate) {
     const insights = await generateAIInsights(
       user.industry,
-      user.location, // e.g., "Bhubaneswar, India"
-      user.experienceLevel // e.g., "Mid-level"
+      user.location || "Global",
+      user.experience ?? 0
     );
-    const industryInsight = await db.industryInsight.create({
-      data: {
+
+    // Upsert to handle both create and update cases
+    const industryInsight = await db.industryInsight.upsert({
+      where: { industry: user.industry },
+      create: {
         industry: user.industry,
         ...insights,
+        nextUpdate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+      update: {
+        ...insights,
+        lastUpdated: new Date(),
         nextUpdate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });

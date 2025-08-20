@@ -28,6 +28,7 @@ model User {
   // Profile fields
   bio           String?
   experience    Int?      // Years of experience
+  location      String?
   
   // Relations
   skills        String[]  // Array of skills
