@@ -7,7 +7,95 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 console.log(">>>>>> [SERVER LOG] Checking API Key:", process.env.GEMINI_API_KEY);
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+// Resilient model selection: try a list of candidate models and cache the first
+// available one. If the chosen model later returns a 404 (not supported for
+// generateContent), we'll attempt the next candidate. This avoids hard failures
+// when model names or API versions change.
+const CANDIDATE_MODELS = [
+  // Preferred Gemini candidates (try more recent first)
+  "gemini-2.5-flash",
+  "gemini-1.5",
+  "gemini-2.5-pro",
+  "gemini-2.0",
+  // Fallback to text-bison (older text model) if Gemini variants are not available
+  "text-bison-001",
+  "text-bison",
+];
+
+let cachedModelName = null;
+let cachedModel = null;
+
+async function chooseModel() {
+  if (cachedModel) return cachedModel;
+
+  // If the SDK exposes a listModels method, log available models for diagnostics
+  try {
+    if (typeof genAI.listModels === "function") {
+      const list = await genAI.listModels();
+      console.log(">>>>>> [SERVER LOG] Available models:", JSON.stringify(list, null, 2));
+    }
+  } catch (err) {
+    // ignore listing errors — we still try candidates below
+    console.warn(">>>>>> [SERVER WARN] listModels failed:", err?.message || err);
+  }
+
+  for (const name of CANDIDATE_MODELS) {
+    try {
+      const m = genAI.getGenerativeModel({ model: name });
+      // Test a no-op call if the SDK provides a quick validation method. If not,
+      // we optimistically select the model and handle errors on generate.
+      cachedModelName = name;
+      cachedModel = m;
+      console.log(">>>>>> [SERVER LOG] Selected generative model:", name);
+      return cachedModel;
+    } catch (err) {
+      console.warn(">>>>>> [SERVER WARN] model not available:", name, (err && err.message) || err);
+      // try next candidate
+    }
+  }
+
+  // If none selected, throw a descriptive error
+  throw new Error(
+    "No available generative model found. Check your Google Generative AI API access and model names."
+  );
+}
+
+// Helper to run generateContent with model-fallback on 404 Not Found errors
+async function generateWithFallback(prompt) {
+  // Ensure we have a model selected
+  let modelInstance = await chooseModel();
+
+  try {
+    return await modelInstance.generateContent(prompt);
+  } catch (err) {
+    // If model not found for this API version, try next candidate (common 404 case)
+    const status = err?.status || err?.response?.status;
+    console.warn(">>>>>> [SERVER WARN] generateContent failed:", err?.message || err, "status:", status);
+
+    if (status === 404) {
+      // Invalidate cached model and try remaining candidates
+      const tried = new Set([cachedModelName]);
+      cachedModel = null;
+
+      for (const name of CANDIDATE_MODELS) {
+        if (tried.has(name)) continue;
+        try {
+          const m = genAI.getGenerativeModel({ model: name });
+          cachedModelName = name;
+          cachedModel = m;
+          console.log(">>>>>> [SERVER LOG] Falling back to model:", name);
+          return await cachedModel.generateContent(prompt);
+        } catch (innerErr) {
+          console.warn(">>>>>> [SERVER WARN] fallback model failed:", name, (innerErr && innerErr.message) || innerErr);
+        }
+      }
+    }
+
+    // If we couldn't recover, rethrow the original error for higher-level handling
+    throw err;
+  }
+}
 
 export async function generateQuiz() {
   const { userId } = await auth();
@@ -46,7 +134,7 @@ export async function generateQuiz() {
   `;
 
   try {
-    const result = await model.generateContent(prompt);
+  const result = await generateWithFallback(prompt);
     const response = result.response;
     const text = response.text();
     const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
@@ -102,9 +190,9 @@ export async function saveQuizResult(questions, answers, score) {
     `;
 
     try {
-      const tipResult = await model.generateContent(improvementPrompt);
+  const tipResult = await generateWithFallback(improvementPrompt);
 
-      improvementTip = tipResult.response.text().trim();
+  improvementTip = tipResult.response.text().trim();
       console.log(improvementTip);
     } catch (error) {
       console.error("Error generating improvement tip:", error);
