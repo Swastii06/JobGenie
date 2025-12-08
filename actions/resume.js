@@ -63,15 +63,13 @@ export async function improveWithAI({ current, type }) {
 
   const user = await db.user.findUnique({
     where: { clerkUserId: userId },
-    include: {
-      industryInsight: true,
-    },
   });
 
   if (!user) throw new Error("User not found");
+  const industryContext = user.industry ? `${user.industry} professional` : "professional";
 
   const prompt = `
-    As an expert resume writer, improve the following ${type} description for a ${user.industry} professional.
+    As an expert resume writer, improve the following ${type} description for a ${industryContext}.
     Make it more impactful, quantifiable, and aligned with industry standards.
     Current content: "${current}"
 
@@ -93,6 +91,6 @@ export async function improveWithAI({ current, type }) {
     return improvedContent;
   } catch (error) {
     console.error("Error improving content:", error);
-    throw new Error("Failed to improve content");
+    throw new Error("Failed to improve content with AI. Please try again.");
   }
 }
