@@ -78,7 +78,7 @@ const Header = () => {
                   {/* And here */}
                   <Link href="/interview" className="flex items-center gap-2 my-2">
                     <GraduationCap className="h-4 w-4" />
-                    Interview Prep
+                    Mock Quiz
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>

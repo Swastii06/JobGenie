@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,11 @@ export default function Quiz() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [showExplanation, setShowExplanation] = useState(false);
+  const [timer, setTimer] = useState(30);
+
+  const timerRef = useRef(30); // ref-backed counter to avoid stale closures
+  const handleNextRef = useRef(() => {});
+  const quizDataRef = useRef(null);
 
   const {
     loading: generatingQuiz,
@@ -35,28 +40,14 @@ export default function Quiz() {
     setData: setResultData,
   } = useFetch(saveQuizResult);
 
-  useEffect(() => {
-    if (quizData) {
-      setAnswers(new Array(quizData.length).fill(null));
-    }
-  }, [quizData]);
-
   const handleAnswer = (answer) => {
     const newAnswers = [...answers];
     newAnswers[currentQuestion] = answer;
     setAnswers(newAnswers);
   };
 
-  const handleNext = () => {
-    if (currentQuestion < quizData.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-      setShowExplanation(false);
-    } else {
-      finishQuiz();
-    }
-  };
-
-  const calculateScore = () => {
+  const calculateScore = useCallback(() => {
+    if (!quizData) return 0;
     let correct = 0;
     answers.forEach((answer, index) => {
       if (answer === quizData[index].correctAnswer) {
@@ -64,9 +55,9 @@ export default function Quiz() {
       }
     });
     return (correct / quizData.length) * 100;
-  };
+  }, [answers, quizData]);
 
-  const finishQuiz = async () => {
+  const finishQuiz = useCallback(async () => {
     const score = calculateScore();
     try {
       await saveQuizResultFn(quizData, answers, score);
@@ -74,12 +65,77 @@ export default function Quiz() {
     } catch (error) {
       toast.error(error.message || "Failed to save quiz results");
     }
-  };
+  }, [quizData, answers, calculateScore, saveQuizResultFn]);
+
+  const handleNext = useCallback(() => {
+    if (quizData && currentQuestion < quizData.length - 1) {
+      setCurrentQuestion((prev) => prev + 1);
+      setShowExplanation(false);
+      // reset timer UI/state for new question
+      setTimer(30);
+      timerRef.current = 30;
+    } else {
+      finishQuiz();
+    }
+  }, [quizData, currentQuestion, finishQuiz]);
+
+  // keep refs in sync to avoid stale closures inside intervals
+  useEffect(() => {
+    handleNextRef.current = handleNext;
+    quizDataRef.current = quizData;
+  }, [handleNext, quizData]);
+
+  // initialize answers array when quiz data arrives
+  useEffect(() => {
+    if (quizData) {
+      setAnswers(new Array(quizData.length).fill(null));
+      // reset question index and timer when a new quiz is generated
+      setCurrentQuestion(0);
+      setShowExplanation(false);
+      setTimer(30);
+      timerRef.current = 30;
+    }
+  }, [quizData]);
+
+  // Robust timer effect using a ref-backed counter
+  useEffect(() => {
+    // do nothing if quiz not loaded
+    if (!quizDataRef.current) {
+      setTimer(30);
+      timerRef.current = 30;
+      return;
+    }
+
+    // If explanation is shown, pause the timer (UI stays at current value)
+    if (showExplanation) {
+      return;
+    }
+
+    // reset timer for the new question
+    timerRef.current = 30;
+    setTimer(30);
+
+    const id = setInterval(() => {
+      timerRef.current -= 1;
+      setTimer(timerRef.current);
+
+      if (timerRef.current <= 0) {
+        clearInterval(id);
+        // auto advance using ref to avoid stale closures
+        handleNextRef.current();
+      }
+    }, 1000);
+
+    return () => clearInterval(id);
+    // include quizData to restart timer when quiz is newly loaded
+  }, [currentQuestion, showExplanation, quizData]);
 
   const startNewQuiz = () => {
     setCurrentQuestion(0);
     setAnswers([]);
     setShowExplanation(false);
+    setTimer(30);
+    timerRef.current = 30;
     generateQuizFn();
     setResultData(null);
   };
@@ -123,9 +179,22 @@ export default function Quiz() {
   return (
     <Card className="mx-2">
       <CardHeader>
-        <CardTitle>
-          Question {currentQuestion + 1} of {quizData.length}
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle>
+            Question {currentQuestion + 1} of {quizData.length}
+          </CardTitle>
+          {!showExplanation && (
+            <div className="flex items-center gap-2">
+              <div
+                className={`text-lg font-semibold ${
+                  timer <= 10 ? "text-red-500" : "text-foreground"
+                }`}
+              >
+                {timer}s
+              </div>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-lg font-medium">{question.question}</p>
@@ -136,8 +205,13 @@ export default function Quiz() {
         >
           {question.options.map((option, index) => (
             <div key={index} className="flex items-center space-x-2">
-              <RadioGroupItem value={option} id={`option-${index}`} />
-              <Label htmlFor={`option-${index}`}>{option}</Label>
+              <RadioGroupItem
+                value={option}
+                id={`option-${currentQuestion}-${index}`}
+              />
+              <Label htmlFor={`option-${currentQuestion}-${index}`}>
+                {option}
+              </Label>
             </div>
           ))}
         </RadioGroup>
