@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Download,
   Edit,
+  Sparkles,
   Loader2,
   Monitor,
   Save,
@@ -17,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { saveResume } from "@/actions/resume";
+import { improveWithAI, saveResume } from "@/actions/resume";
 import { EntryForm } from "./entry-form";
 import useFetch from "@/hooks/use-fetch";
 import { useUser } from "@clerk/nextjs";
@@ -36,6 +37,7 @@ export default function ResumeBuilder({ initialContent }) {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(resumeSchema),
@@ -55,6 +57,14 @@ export default function ResumeBuilder({ initialContent }) {
     data: saveResult,
     error: saveError,
   } = useFetch(saveResume);
+
+  // Improve Professional Summary with AI
+  const {
+    loading: isImprovingSummary,
+    fn: improveSummaryFn,
+    data: improvedSummary,
+    error: improveSummaryError,
+  } = useFetch(improveWithAI);
 
   // Watch form fields for preview updates
   const formValues = watch();
@@ -80,6 +90,17 @@ export default function ResumeBuilder({ initialContent }) {
       toast.error(saveError.message || "Failed to save resume");
     }
   }, [saveResult, saveError, isSaving]);
+
+  // Handle AI improvement result for summary
+  useEffect(() => {
+    if (improvedSummary && !isImprovingSummary) {
+      setValue("summary", improvedSummary);
+      toast.success("Summary improved!");
+    }
+    if (improveSummaryError) {
+      toast.error(improveSummaryError.message || "Failed to improve summary");
+    }
+  }, [improvedSummary, improveSummaryError, isImprovingSummary, setValue]);
 
   const getContactMarkdown = () => {
     const { contactInfo } = formValues;
@@ -130,6 +151,19 @@ export default function ResumeBuilder({ initialContent }) {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleImproveSummary = async () => {
+    const currentSummary = watch("summary");
+    if (!currentSummary) {
+      toast.error("Please enter a summary first");
+      return;
+    }
+
+    await improveSummaryFn({
+      current: currentSummary,
+      type: "professional summary",
+    });
   };
 
   const onSubmit = async (data) => {
@@ -274,6 +308,27 @@ export default function ResumeBuilder({ initialContent }) {
               {errors.summary && (
                 <p className="text-sm text-red-500">{errors.summary.message}</p>
               )}
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleImproveSummary}
+                  disabled={isImprovingSummary || !watch("summary")}
+                >
+                  {isImprovingSummary ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Improving...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Improve with AI
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {/* Skills */}
