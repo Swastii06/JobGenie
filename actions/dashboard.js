@@ -4,14 +4,26 @@ import { db } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Preferred Gemini models in order; fall back to earlier variants if unavailable.
+const MODEL_CANDIDATES = [
+  "gemini-2.5-flash",
+  "gemini-1.5-flash",
+  "gemini-2.0-flash-exp",
+];
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Use a current model that supports generateContent on v1beta
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const lerp = (a, b, t) => a + (b - a) * t;
 
+const USD_TO_INR = 83; // fixed conversion for now; adjust if env-based later
+
 const normalizeSalaryRanges = (ranges, experience, location) => {
   const years = typeof experience === "number" ? experience : 0;
+  // Global downscale to keep predictions conservative
+  const globalScale = 0.6;
   // Base brackets in USD per year
   let bracket;
   if (years <= 1) {
@@ -36,7 +48,7 @@ const normalizeSalaryRanges = (ranges, experience, location) => {
   } else if (/(usa|united states|us|san francisco|new york|seattle|boston|austin)/.test(loc)) {
     multiplier = 1.1;
   } else {
-    multiplier = 0.8;
+    multiplier = 0.2;
   }
 
   const safeRanges = Array.isArray(ranges) ? ranges : [];
@@ -72,9 +84,33 @@ const normalizeSalaryRanges = (ranges, experience, location) => {
     const jitterSeed = ((idx + 1) * 9301 + 49297) % 233280;
     const jitter = ((jitterSeed / 233280) - 0.5) * 0.06; // -3%..+3%
 
-    let min = Math.round(preMultMin * multiplier * (1 + jitter));
-    let median = Math.round(preMultMedian * multiplier * (1 + jitter));
-    let max = Math.round(preMultMax * multiplier * (1 + jitter));
+    // Convert to INR and apply final scaling; bias min down, allow max up more
+    const minBias = 0.4;
+    const medianBias = 0.95;
+    const maxBoost = 1.5;
+
+    let min = Math.round(
+      preMultMin *
+        multiplier *
+        (1 + jitter) *
+        globalScale *
+        minBias *
+        USD_TO_INR
+    );
+    let median = Math.round(
+      preMultMedian *
+        multiplier *
+        (1 + jitter) *
+        globalScale *
+        medianBias *
+        USD_TO_INR
+    );
+    let max = Math.round(
+      preMultMax * multiplier * (1 + jitter) * globalScale * USD_TO_INR
+    );
+
+    // Boost the top of the range
+    max = Math.round(max * maxBoost);
 
     // Final ordering guard
     if (median < min) median = min + 1000;
@@ -145,21 +181,36 @@ export const generateAIInsights = async (industry, location, experience) => {
     Include at least 5 skills and trends.
   `;
 
-  try {
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
-    const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
-    const parsed = JSON.parse(cleanedText);
-    // Normalize salaries with guardrails
-    parsed.salaryRanges = normalizeSalaryRanges(parsed.salaryRanges, experience, location);
-    return parsed;
-  } catch (err) {
-    console.error("AI insights generation failed, using fallback:", err?.message || err);
+  // No API key? Skip remote call and use deterministic fallback.
+  if (!process.env.GEMINI_API_KEY) {
     const fb = fallback();
     fb.salaryRanges = normalizeSalaryRanges(fb.salaryRanges, experience, location);
     return fb;
   }
+
+  let lastError;
+  for (const modelName of MODEL_CANDIDATES) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const response = result.response;
+      const text = response.text();
+      const cleanedText = text.replace(/```(?:json)?\n?/g, "").trim();
+      const parsed = JSON.parse(cleanedText);
+      parsed.salaryRanges = normalizeSalaryRanges(parsed.salaryRanges, experience, location);
+      return parsed;
+    } catch (err) {
+      lastError = err;
+      // If the model is not found, try the next candidate; otherwise break early.
+      const msg = err?.message || "";
+      if (!/not found/i.test(msg)) break;
+    }
+  }
+
+  console.error("AI insights generation failed, using fallback:", lastError?.message || lastError);
+  const fb = fallback();
+  fb.salaryRanges = normalizeSalaryRanges(fb.salaryRanges, experience, location);
+  return fb;
 };
 
 export async function getIndustryInsights() {
@@ -176,7 +227,13 @@ export async function getIndustryInsights() {
   if (!user) throw new Error("User not found");
 
   // If no insights exist OR existing is a placeholder/incomplete, generate or refresh them
+  const needsRefreshAfterProfileUpdate =
+    user.industryInsight?.lastUpdated &&
+    user.updatedAt &&
+    user.updatedAt > user.industryInsight.lastUpdated;
+
   const shouldGenerate =
+    needsRefreshAfterProfileUpdate ||
     !user.industryInsight ||
     !Array.isArray(user.industryInsight.salaryRanges) ||
     user.industryInsight.salaryRanges.length === 0 ||

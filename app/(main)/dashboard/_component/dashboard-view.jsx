@@ -31,12 +31,18 @@ import Link from "next/link";
 
 const DashboardView = ({ insights }) => {
   // Transform salary data for the chart
-  const salaryData = insights.salaryRanges.map((range) => ({
-    name: range.role,
-    min: range.min / 1000,
-    max: range.max / 1000,
-    median: range.median / 1000,
-  }));
+  const salaryData = insights.salaryRanges.map((range) => {
+    const toLPA = (value) =>
+      Number((Number(value || 0) / 100000).toFixed(2));
+
+    return {
+      name: range.role,
+      // values are already INR; convert to LPA (Lakhs per annum) and round to 2 decimals
+      min: toLPA(range.min),
+      max: toLPA(range.max),
+      median: toLPA(range.median),
+    };
+  });
 
   const getDemandLevelColor = (level) => {
     switch (level.toLowerCase()) {
@@ -150,17 +156,26 @@ const DashboardView = ({ insights }) => {
       {/* Salary Ranges Chart */}
       <Card className="col-span-4">
         <CardHeader>
-          <CardTitle>Salary Ranges by Role</CardTitle>
+          <CardTitle>Salary Ranges by Role (LPA)</CardTitle>
           <CardDescription>
-            Displaying minimum, median, and maximum salaries (in thousands)
+            Displaying minimum, median, and maximum salaries in LPA (₹ Lakhs)
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={salaryData}>
+              <BarChart
+                data={salaryData}
+                margin={{ top: 16, right: 16, left: 16, bottom: 64 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <XAxis
+                  dataKey="name"
+                  interval={0}
+                  tickMargin={12}
+                  height={60}
+                  tick={{ fontSize: 12, angle: -10 }}
+                />
                 <YAxis />
                 <Tooltip
                   content={({ active, payload, label }) => {
@@ -170,7 +185,7 @@ const DashboardView = ({ insights }) => {
                           <p className="font-medium">{label}</p>
                           {payload.map((item) => (
                             <p key={item.name} className="text-sm">
-                              {item.name}: ${item.value}K
+                              {item.name}: ₹{item.value} LPA
                             </p>
                           ))}
                         </div>
