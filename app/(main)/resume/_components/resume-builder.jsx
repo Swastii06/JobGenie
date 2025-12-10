@@ -20,11 +20,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { improveWithAI, saveResume } from "@/actions/resume";
 import { EntryForm } from "./entry-form";
+import { CertificationsForm } from "./certifications-form";
+import { ExtraSectionsForm } from "./extra-sections-form";
 import useFetch from "@/hooks/use-fetch";
 import { useUser } from "@clerk/nextjs";
 import { entriesToMarkdown } from "@/app/lib/helper";
-import { resumeSchema } from "@/app/lib/schema";
-import html2pdf from "html2pdf.js/dist/html2pdf.min.js";
+import { resumeSchema } from "@/lib/schema";
+// html2pdf accesses `self` at module-evaluation time which breaks SSR.
+// Dynamically import it inside the browser-only handler instead.
 
 export default function ResumeBuilder({ initialContent }) {
   const [activeTab, setActiveTab] = useState("edit");
@@ -48,6 +51,8 @@ export default function ResumeBuilder({ initialContent }) {
       experience: [],
       education: [],
       projects: [],
+      certifications: [],
+      extraSections: [],
     },
   });
 
@@ -105,27 +110,69 @@ export default function ResumeBuilder({ initialContent }) {
   const getContactMarkdown = () => {
     const { contactInfo } = formValues;
     const parts = [];
-    if (contactInfo.email) parts.push(`📧 ${contactInfo.email}`);
-    if (contactInfo.mobile) parts.push(`📱 ${contactInfo.mobile}`);
-    if (contactInfo.linkedin)
-      parts.push(`💼 [LinkedIn](${contactInfo.linkedin})`);
-    if (contactInfo.twitter) parts.push(`🐦 [Twitter](${contactInfo.twitter})`);
+    if (contactInfo.email) parts.push(contactInfo.email);
+    if (contactInfo.mobile) parts.push(contactInfo.mobile);
+    if (contactInfo.linkedin) parts.push(`[LinkedIn](${contactInfo.linkedin})`);
+    if (contactInfo.github) parts.push(`[GitHub](${contactInfo.github})`);
+    if (contactInfo.twitter) parts.push(`[Twitter](${contactInfo.twitter})`);
 
-    return parts.length > 0
-      ? `## <div align="center">${user.fullName}</div>
-        \n\n<div align="center">\n\n${parts.join(" | ")}\n\n</div>`
-      : "";
+    const contactLine = parts.length > 0 ? parts.join(" | ") : "";
+    const name = user?.fullName || "Your Name";
+    return contactLine ? `${name}\n\n${contactLine}` : name;
+  };
+
+  const getSkillsMarkdown = () => {
+    const { skills } = formValues;
+    if (!skills) return "";
+    
+    // Parse skills into categories if formatted that way, otherwise just list them
+    const skillLines = skills.split("\n").filter(line => line.trim());
+    return `## TECHNICAL SKILLS AND TOOLS\n\n${skillLines.map(line => line.trim()).join("\n")}`;
+  };
+
+  const getCertificationsMarkdown = () => {
+    const { certifications } = formValues;
+    if (!certifications?.length) return "";
+
+    return (
+      `## CERTIFICATIONS\n\n` +
+      certifications
+        .map((cert) => {
+          const lines = [`**${cert.name}**`];
+          if (cert.issuer) lines.push(`Issued by: ${cert.issuer}`);
+          if (cert.date) lines.push(`Date: ${cert.date}`);
+          if (cert.link) lines.push(`[Link](${cert.link})`);
+          return lines.join("\n");
+        })
+        .join("\n\n")
+    );
+  };
+
+  const getExtraSectionsMarkdown = () => {
+    const { extraSections } = formValues;
+    if (!extraSections?.length) return "";
+
+    return extraSections
+      .map((section) => {
+        const items = section.items
+          .filter((item) => item.trim())
+          .map((item) => `*   ${item.trim()}`);
+        return `## ${section.title.toUpperCase()}\n\n${items.join("\n")}`;
+      })
+      .join("\n\n");
   };
 
   const getCombinedContent = () => {
-    const { summary, skills, experience, education, projects } = formValues;
+    const { summary, experience, education, projects } = formValues;
     return [
       getContactMarkdown(),
-      summary && `## Professional Summary\n\n${summary}`,
-      skills && `## Skills\n\n${skills}`,
-      entriesToMarkdown(experience, "Work Experience"),
+      summary && `## PROFESSIONAL SUMMARY\n\n${summary}`,
+      getSkillsMarkdown(),
       entriesToMarkdown(education, "Education"),
+      entriesToMarkdown(experience, "Work Experience"),
       entriesToMarkdown(projects, "Projects"),
+      getCertificationsMarkdown(),
+      getExtraSectionsMarkdown(),
     ]
       .filter(Boolean)
       .join("\n\n");
@@ -136,7 +183,14 @@ export default function ResumeBuilder({ initialContent }) {
   const generatePDF = async () => {
     setIsGenerating(true);
     try {
+      if (typeof window === "undefined") return;
       const element = document.getElementById("resume-pdf");
+      if (!element) throw new Error("Resume element not found");
+
+      // Dynamically import html2pdf so the module is only evaluated in the browser
+      const html2pdfModule = await import("html2pdf.js/dist/html2pdf.min.js");
+      const html2pdf = html2pdfModule?.default ?? html2pdfModule;
+
       const opt = {
         margin: [15, 15],
         filename: "resume.pdf",
@@ -287,6 +341,19 @@ export default function ResumeBuilder({ initialContent }) {
                     </p>
                   )}
                 </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">GitHub Profile</label>
+                  <Input
+                    {...register("contactInfo.github")}
+                    type="url"
+                    placeholder="https://github.com/your-username"
+                  />
+                  {errors.contactInfo?.github && (
+                    <p className="text-sm text-red-500">
+                      {errors.contactInfo.github.message}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -412,6 +479,36 @@ export default function ResumeBuilder({ initialContent }) {
                   {errors.projects.message}
                 </p>
               )}
+            </div>
+
+            {/* Certifications */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Certifications (Optional)</h3>
+              <Controller
+                name="certifications"
+                control={control}
+                render={({ field }) => (
+                  <CertificationsForm
+                    certifications={field.value || []}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+
+            {/* Extra Sections */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Additional Sections (Optional)</h3>
+              <Controller
+                name="extraSections"
+                control={control}
+                render={({ field }) => (
+                  <ExtraSectionsForm
+                    sections={field.value || []}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
             </div>
           </form>
         </TabsContent>

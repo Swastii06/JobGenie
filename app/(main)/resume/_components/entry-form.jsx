@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { entrySchema } from "@/app/lib/schema";
+import { entrySchema } from "@/lib/schema";
 import { Sparkles, PlusCircle, X, Pencil, Save, Loader2 } from "lucide-react";
 import { improveWithAI } from "@/actions/resume";
 import { toast } from "sonner";
@@ -46,6 +46,9 @@ export function EntryForm({ type, entries, onChange }) {
       endDate: "",
       description: "",
       current: false,
+      location: "",
+      link: "",
+      technologies: "",
     },
   });
 
@@ -56,6 +59,9 @@ export function EntryForm({ type, entries, onChange }) {
       ...data,
       startDate: formatDisplayDate(data.startDate),
       endDate: data.current ? "" : formatDisplayDate(data.endDate),
+      location: data.location || "",
+      link: data.link || "",
+      technologies: data.technologies || "",
     };
 
     onChange([...entries, formattedEntry]);
@@ -122,9 +128,21 @@ export function EntryForm({ type, entries, onChange }) {
             <CardContent>
               <p className="text-sm text-muted-foreground">
                 {item.current
-                  ? `${item.startDate} - Present`
-                  : `${item.startDate} - ${item.endDate}`}
+                  ? `${item.startDate} - Present${item.location ? ` | ${item.location}` : ""}`
+                  : `${item.startDate} - ${item.endDate}${item.location ? ` | ${item.location}` : ""}`}
               </p>
+              {item.technologies && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Technologies: {item.technologies}
+                </p>
+              )}
+              {item.link && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    Link
+                  </a>
+                </p>
+              )}
               <p className="mt-2 text-sm whitespace-pre-wrap">
                 {item.description}
               </p>
@@ -163,6 +181,42 @@ export function EntryForm({ type, entries, onChange }) {
                 )}
               </div>
             </div>
+
+            {type === "Project" && (
+              <>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Technologies (e.g., Kotlin, Jetpack Compose, Firebase)"
+                    {...register("technologies")}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Project Link (URL)"
+                    type="url"
+                    {...register("link")}
+                  />
+                </div>
+              </>
+            )}
+
+            {type === "Education" && (
+              <div className="space-y-2">
+                <Input
+                  placeholder="Location (e.g., Burla, Odisha)"
+                  {...register("location")}
+                />
+              </div>
+            )}
+
+            {type === "Experience" && (
+              <div className="space-y-2">
+                <Input
+                  placeholder="Location (e.g., Remote, Bhubaneswar)"
+                  {...register("location")}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
