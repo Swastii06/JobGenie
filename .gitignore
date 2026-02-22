@@ -44,3 +44,7 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# Proctoring system (deployed separately to jobgenie-proctoring repo)
+/An-Inbrowser-Proctoring-System/
+
