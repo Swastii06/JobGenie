@@ -25,56 +25,62 @@ export default function QuizList({ assessments }) {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="gradient-title text-3xl md:text-4xl">
-                Recent Quizzes
-              </CardTitle>
-              <CardDescription>
-                Review your past quiz performance
-              </CardDescription>
-            </div>
-            <Button onClick={() => router.push("/interview/mock")}>
-              Start New Quiz
-            </Button>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h3 className="font-semibold text-lg">Recent Quizzes</h3>
+            <p className="text-sm text-muted-foreground">
+              Review your past performance
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {assessments?.map((assessment, i) => (
+          <Button 
+            onClick={() => router.push("/interview/mock")}
+            size="sm"
+            className="whitespace-nowrap"
+          >
+            New Quiz
+          </Button>
+        </div>
+        
+        {assessments && assessments.length > 0 ? (
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {assessments?.slice(0, 5).map((assessment, i) => (
               <Card
                 key={assessment.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => setSelectedQuiz(assessment)}
               >
-                <CardHeader>
-                  <CardTitle className="gradient-title text-2xl">
-                    Quiz {i + 1}
-                  </CardTitle>
-                  <CardDescription className="flex justify-between w-full">
-                    <div>Score: {assessment.quizScore.toFixed(1)}%</div>
-                    <div>
-                      {format(
-                        new Date(assessment.createdAt),
-                        "MMMM dd, yyyy HH:mm"
-                      )}
+                <CardContent className="pt-3 pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">Quiz {i + 1}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(
+                          new Date(assessment.createdAt),
+                          "MMM dd, yyyy"
+                        )}
+                      </p>
                     </div>
-                  </CardDescription>
-                </CardHeader>
-                {assessment.improvementTip && (
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {assessment.improvementTip}
-                    </p>
-                  </CardContent>
-                )}
+                    <div className="text-right">
+                      <p className="font-bold text-lg text-green-600">
+                        {assessment.quizScore.toFixed(0)}%
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
               </Card>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        ) : (
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <p className="text-sm text-muted-foreground text-center">
+                No quizzes yet. Start a new quiz to get started!
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       <Dialog open={!!selectedQuiz} onOpenChange={() => setSelectedQuiz(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
