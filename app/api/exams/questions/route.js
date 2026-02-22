@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
@@ -24,7 +24,7 @@ export async function GET(req) {
     }
 
     // Get questions from database
-    const questions = await prisma.question.findMany({
+    const questions = await db.question.findMany({
       where: {
         industry: industry,
         questionType: type,

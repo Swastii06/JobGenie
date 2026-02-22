@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {
@@ -25,7 +25,7 @@ export async function POST(req) {
     } = body;
 
     // Get user from database using clerk ID
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { clerkUserId: userId },
     });
 
@@ -34,7 +34,7 @@ export async function POST(req) {
     }
 
     // Create exam attempt record
-    const examAttempt = await prisma.examAttempt.create({
+    const examAttempt = await db.examAttempt.create({
       data: {
         userId: user.id,
         examId: "", // Will be updated if we have predefined exams
