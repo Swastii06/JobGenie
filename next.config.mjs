@@ -1,7 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverActions: true, // This is the required part to fix the error
+    // serverActions must be an object in Next 15+; using an empty object
+    // preserves feature flags without passing a boolean which Next rejects.
+    serverActions: {},
   },
   images: {
     remotePatterns: [

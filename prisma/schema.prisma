@@ -34,6 +34,10 @@ model User {
   assessments   Assessment[]
   resume        Resume?
   coverLetter   CoverLetter[]
+  proctoringSession ProctoringSession[]
+  proctoringReports ProctoringReport[]
+  proctoredExams ProctoredExam[] @relation("UserProctoredExams")
+  examAttempts  ExamAttempt[] @relation("UserExamAttempts")
 }
 
 model Assessment {
@@ -115,4 +119,200 @@ enum MarketOutlook{
   POSITIVE
   NEUTRAL
   NEGATIVE
+}
+
+// ============ PROCTORING SYSTEM MODELS ============
+
+model ProctoringSession {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Session details
+  examId          Int?      // Link to Django proctoring system exam ID
+  examName        String
+  status          String    @default("initialized")  // initialized, started, completed, cancelled
+  
+  // Student face data for verification
+  faceEncodingData String?   // JSON string of face encoding
+  studentPhotoUrl String?
+  
+  // Exam metadata
+  totalQuestions  Int?
+  correctAnswers  Int?
+  score           Float?
+  
+  // Session timestamps
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  violations      ProctoringViolation[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ProctoringViolation {
+  id              String    @id @default(cuid())
+  sessionId       String
+  session         ProctoringSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  // Violation details
+  violationType   String    // "face_not_detected", "object_detected", "tab_switch", "suspicious_gaze", "audio_detected", etc.
+  severity        String    @default("medium")  // low, medium, high
+  description     String?
+  
+  // Violation metadata
+  detectedObjects String[]  // Array of object names detected (e.g., ["phone", "book"])
+  tabSwitchCount  Int       @default(0)
+  
+  // Evidence
+  evidenceImageUrl String?
+  evidenceData    Json?     // Additional metadata about the violation
+  
+  // Timestamps
+  detectedAt      DateTime  @default(now())
+  acknowledgedAt  DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([sessionId])
+  @@index([violationType])
+}
+
+model ProctoringReport {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Report metadata
+  reportTitle     String
+  examName        String
+  
+  // Violation summary
+  totalViolations Int       @default(0)
+  highSeverity    Int       @default(0)
+  mediumSeverity  Int       @default(0)
+  lowSeverity     Int       @default(0)
+  
+  // Performance
+  quizScore       Float?
+  timeSpent       Int?      // in seconds
+  
+  // Report status
+  status          String    @default("pending")  // pending, reviewed, approved, flagged
+  reviewerNotes   String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// Question bank for different question types
+model Question {
+  id              String    @id @default(cuid())
+  
+  // Question content
+  questionText    String    @db.Text
+  questionType    String    // "MCQ", "CODING", "SUBJECTIVE", "FILL_BLANK"
+  industry        String?   // Filter by industry
+  difficulty      String    @default("medium")  // easy, medium, hard
+  
+  // MCQ specific
+  options         String[]  // Multiple choice options
+  correctAnswer   String?   // For MCQ or FILL_BLANK
+  
+  // Coding specific
+  codeTemplate    String?   @db.Text
+  expectedOutput  String?   @db.Text
+  testCases       Json?     // Array of {input, output}
+  
+  // Metadata
+  tags            String[]
+  explanation     String?   @db.Text
+  timeEstimate    Int?      // Estimated time in seconds
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([questionType])
+  @@index([industry])
+  @@index([difficulty])
+}
+
+// Exam configuration - customizable exams
+model ProctoredExam {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation("UserProctoredExams", fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Exam details
+  examTitle       String
+  industry        String
+  description     String?
+  
+  // Question configuration
+  mcqCount        Int       @default(0)
+  codingCount     Int       @default(0)
+  subjectiveCount Int       @default(0)
+  fillBlankCount  Int       @default(0)
+  
+  // Exam settings
+  totalDuration   Int       // Duration in minutes
+  passingScore    Float     @default(60.0)
+  
+  // Proctoring
+  proctor         String    @default("enabled")  // enabled, disabled
+  
+  // Status
+  status          String    @default("draft")    // draft, published, archived
+  
+  attempts        ExamAttempt[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([industry])
+}
+
+// Exam attempt - tracks when a user takes an exam
+model ExamAttempt {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation("UserExamAttempts", fields: [userId], references: [id], onDelete: Cascade)
+  
+  proctoredExam   ProctoredExam @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examId          String
+  
+  // Attempt tracking
+  startTime       DateTime
+  endTime         DateTime?
+  timeSpent       Int?      // in seconds
+  status          String    @default("in_progress")  // in_progress, completed, submitted
+  
+  // Results
+  totalScore      Float?
+  percentageScore Float?
+  isPassing       Boolean   @default(false)
+  
+  // Answers - JSON array of {questionId, questionType, userAnswer, isCorrect, marks}
+  answers         Json[]
+  
+  // Proctoring data
+  violations      Json[]    // Array of violation events
+  flaggedForReview Boolean  @default(false)
+  reviewNotes     String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([examId])
+  @@index([status])
 }
