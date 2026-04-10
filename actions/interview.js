@@ -986,6 +986,10 @@ export async function getAssessments() {
   if (!user) throw new Error("User not found");
 
   try {
+    const isMissingTableError = (err, tableName) =>
+      err?.code === "P2021" &&
+      String(err?.meta?.table || "").toLowerCase().includes(String(tableName).toLowerCase());
+
     // Mock quiz assessments
     const quizAssessments = await db.assessment.findMany({
       where: {
@@ -996,19 +1000,31 @@ export async function getAssessments() {
       },
     });
 
-    // Custom exam attempts (completed only)
-    const examAttempts = await db.examAttempt.findMany({
-      where: {
-        userId: user.id,
-        status: "completed",
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
-      include: {
-        proctoredExam: true,
-      },
-    });
+    // Custom exam attempts (completed only). If the table is not migrated yet,
+    // gracefully continue with quiz assessments instead of crashing the page.
+    let examAttempts = [];
+    try {
+      examAttempts = await db.examAttempt.findMany({
+        where: {
+          userId: user.id,
+          status: "completed",
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+        include: {
+          proctoredExam: true,
+        },
+      });
+    } catch (examErr) {
+      if (isMissingTableError(examErr, "ExamAttempt")) {
+        console.warn(
+          "[Assessments] ExamAttempt table missing (migration not applied). Returning quiz assessments only."
+        );
+      } else {
+        throw examErr;
+      }
+    }
 
     // Normalize into a single collection used by UI
     const normalizedQuizAssessments = quizAssessments.map((a) => ({
