@@ -3,6 +3,9 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ProctoredQuiz from "./_components/proctored-quiz";
 
+// Force dynamic rendering - Clerk uses headers for authentication
+export const dynamic = 'force-dynamic';
+
 export default function MockInterviewPage() {
   return (
     <div className="container mx-auto space-y-4 py-6">
