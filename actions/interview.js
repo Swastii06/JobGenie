@@ -368,6 +368,10 @@ export async function saveQuizResult(questions, answers, score) {
 
 // ============ CUSTOM EXAM PERSISTENCE ============
 
+const isMissingPrismaTable = (err, tableName) =>
+  err?.code === "P2021" &&
+  String(err?.meta?.table || "").toLowerCase().includes(String(tableName).toLowerCase());
+
 // Create a ProctoredExam record for a custom exam configuration
 export async function createCustomProctoredExam(examConfig) {
   const { userId } = await auth();
@@ -416,6 +420,22 @@ export async function createCustomProctoredExam(examConfig) {
 
     return exam;
   } catch (error) {
+    if (isMissingPrismaTable(error, "ProctoredExam")) {
+      console.warn(
+        "[CustomExam] ProctoredExam table missing. Continuing without DB persistence for this exam."
+      );
+      // Return a synthetic exam object so the exam flow can proceed.
+      return {
+        id: `local-${Date.now()}`,
+        userId: user.id,
+        examTitle,
+        industry: examConfig.industry || "general",
+        totalDuration: examConfig.duration || 60,
+        passingScore,
+        proctor: proctorStatus,
+        status: "published",
+      };
+    }
     console.error("Error creating custom proctored exam:", error);
     throw new Error("Failed to create custom exam");
   }
@@ -434,6 +454,12 @@ export async function saveExamAttemptResult({ examId, startTime, endTime, config
 
   if (!examId) {
     throw new Error("Missing examId for exam attempt");
+  }
+
+  // Synthetic local exam ids indicate DB exam table wasn't available.
+  if (String(examId).startsWith("local-")) {
+    console.warn("[CustomExam] Skipping exam attempt DB save because exam is local-only.");
+    return { id: `local-attempt-${Date.now()}`, skippedPersistence: true };
   }
 
   const {
@@ -484,6 +510,12 @@ export async function saveExamAttemptResult({ examId, startTime, endTime, config
 
     return attempt;
   } catch (error) {
+    if (isMissingPrismaTable(error, "ExamAttempt")) {
+      console.warn(
+        "[CustomExam] ExamAttempt table missing. Skipping persistence and returning local placeholder."
+      );
+      return { id: `local-attempt-${Date.now()}`, skippedPersistence: true };
+    }
     console.error("Error saving exam attempt:", error);
     throw new Error("Failed to save exam attempt");
   }
