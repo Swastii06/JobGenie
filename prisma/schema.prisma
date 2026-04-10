@@ -38,6 +38,7 @@ model User {
   proctoringReports ProctoringReport[]
   proctoredExams ProctoredExam[] @relation("UserProctoredExams")
   examAttempts  ExamAttempt[] @relation("UserExamAttempts")
+  codeSubmissions CodeSubmission[]
 }
 
 model Assessment {
@@ -316,3 +317,81 @@ model ExamAttempt {
   @@index([examId])
   @@index([status])
 }
+
+// ============ CODING CHALLENGES MODELS ============
+
+model CodingChallenge {
+  id              String    @id @default(cuid())
+  
+  // Challenge details
+  title           String
+  description     String    @db.Text
+  difficulty      String    @default("medium")  // easy, medium, hard
+  category        String    // "Array", "String", "DP", "Graph", etc.
+  
+  // Code setup
+  languages       String[]  // ["python", "javascript", "java", "cpp", "c"]
+  codeTemplates   Json      // { "python": "def solve():\n    pass", ... }
+  
+  // Test cases
+  testCases       Json      // Array of {input, expectedOutput, isVisible}
+  constraints     String?   @db.Text
+  examples        Json?     // Example test cases with explanations
+  
+  // Metadata
+  tags            String[]
+  acceptance      Float     @default(0)  // Acceptance rate
+  submissionCount Int       @default(0)  // Total submissions
+  
+  // Editorial
+  editorial       String?   @db.Text
+  hints           String[]
+  solutions       Json?     // {language: solution_code}
+  
+  // Relations
+  codeSubmissions CodeSubmission[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([difficulty])
+  @@index([category])
+}
+
+model CodeSubmission {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  challengeId     String
+  challenge       CodingChallenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  
+  // Submission details
+  language        String    // "python", "javascript", "java", "cpp", "c"
+  code            String    @db.Text
+  
+  // Execution results
+  status          String    @default("pending")  // pending, running, completed, error
+  verdict         String    @default("pending")  // accepted, partially_correct, wrong_answer, runtime_error, time_limit_exceeded, compilation_error
+  message         String?   // Error message if failed
+  
+  // Test results
+  passedTests     Int       @default(0)
+  totalTests      Int       @default(0)
+  executionTime   Float?    // in milliseconds
+  memoryUsed      Float?    // in MB
+  
+  // Test case details
+  testResults     Json      // Array of {testCaseId, passed, expectedOutput, actualOutput, error}
+  
+  // Metadata
+  submissionTime  DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([challengeId])
+  @@index([verdict])
+  @@index([submissionTime])
+}
+

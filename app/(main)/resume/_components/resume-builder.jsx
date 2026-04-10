@@ -112,9 +112,9 @@ export default function ResumeBuilder({ initialContent }) {
     const parts = [];
     if (contactInfo.email) parts.push(contactInfo.email);
     if (contactInfo.mobile) parts.push(contactInfo.mobile);
-    if (contactInfo.linkedin) parts.push(`[LinkedIn](${contactInfo.linkedin})`);
-    if (contactInfo.github) parts.push(`[GitHub](${contactInfo.github})`);
-    if (contactInfo.twitter) parts.push(`[Twitter](${contactInfo.twitter})`);
+    if (contactInfo.linkedin) parts.push(`LinkedIn: ${contactInfo.linkedin}`);
+    if (contactInfo.github) parts.push(`GitHub: ${contactInfo.github}`);
+    if (contactInfo.twitter) parts.push(`Twitter: ${contactInfo.twitter}`);
 
     const contactLine = parts.length > 0 ? parts.join(" | ") : "";
     const name = user?.fullName || "Your Name";
@@ -125,9 +125,12 @@ export default function ResumeBuilder({ initialContent }) {
     const { skills } = formValues;
     if (!skills) return "";
     
-    // Parse skills into categories if formatted that way, otherwise just list them
-    const skillLines = skills.split("\n").filter(line => line.trim());
-    return `## TECHNICAL SKILLS AND TOOLS\n\n${skillLines.map(line => line.trim()).join("\n")}`;
+    const skillLines = skills
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => (line.startsWith("- ") ? line : `- ${line}`));
+    return `## TECHNICAL SKILLS AND TOOLS\n\n${skillLines.join("\n")}`;
   };
 
   const getCertificationsMarkdown = () => {
@@ -185,7 +188,10 @@ export default function ResumeBuilder({ initialContent }) {
     try {
       if (typeof window === "undefined") return;
       const element = document.getElementById("resume-pdf");
-      if (!element) throw new Error("Resume element not found");
+      if (!element) {
+        toast.error("Resume preview is not ready yet. Please try again.");
+        return;
+      }
 
       // Dynamically import html2pdf so the module is only evaluated in the browser
       const html2pdfModule = await import("html2pdf.js/dist/html2pdf.min.js");
@@ -202,6 +208,7 @@ export default function ResumeBuilder({ initialContent }) {
       await html2pdf().set(opt).from(element).save();
     } catch (error) {
       console.error("PDF generation error:", error);
+      toast.error("Failed to generate PDF. Please try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -553,19 +560,21 @@ export default function ResumeBuilder({ initialContent }) {
               preview={resumeMode}
             />
           </div>
-          <div className="hidden">
-            <div id="resume-pdf">
-              <MDEditor.Markdown
-                source={previewContent}
-                style={{
-                  background: "white",
-                  color: "black",
-                }}
-              />
-            </div>
-          </div>
         </TabsContent>
       </Tabs>
+
+      {/* Keep PDF source mounted regardless of active tab */}
+      <div className="hidden" aria-hidden="true">
+        <div id="resume-pdf">
+          <MDEditor.Markdown
+            source={previewContent}
+            style={{
+              background: "white",
+              color: "black",
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 import Image from "next/image";
 import React from "react";
+import { usePathname } from "next/navigation";
 import { Button } from "./ui/button";
 import {
   ChevronDown,
@@ -21,6 +22,13 @@ import {
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
 const Header = () => {
+  const pathname = usePathname();
+
+  // Hide global header on focused exam-taking screen
+  if (pathname?.startsWith("/interview/take-exam")) {
+    return null;
+  }
+
   return (
     <header className="fixed top-0 w-full border-b bg-background/80 backdrop-blur-md z-50 supports-[backdrop-filter]:bg-background/60">
       <nav className="container mx-auto px-4 h-20 flex items-center justify-between">
@@ -78,7 +86,7 @@ const Header = () => {
                   {/* And here */}
                   <Link href="/interview" className="flex items-center gap-2 my-2">
                     <GraduationCap className="h-4 w-4" />
-                    Mock Quiz
+                    Interview Prep
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>

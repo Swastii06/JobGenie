@@ -1,7 +1,7 @@
 // components/proctoring/exam-proctoring.jsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertCircle, Loader2 } from "lucide-react";
@@ -29,6 +29,13 @@ export default function ExamProctoring({
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Keep latest callback without retriggering initialization effect
+  const onExamStartedRef = useRef(onExamStarted);
+
+  useEffect(() => {
+    onExamStartedRef.current = onExamStarted;
+  }, [onExamStarted]);
+
   // Initialize exam
   useEffect(() => {
     const initializeExam = async () => {
@@ -42,7 +49,7 @@ export default function ExamProctoring({
 
         setExamId(response.exam_id);
         setExamState("monitoring");
-        onExamStarted?.(response.exam_id);
+        onExamStartedRef.current?.(response.exam_id);
       } catch (err) {
         setError(err.message);
         setExamState("error");
@@ -52,7 +59,7 @@ export default function ExamProctoring({
     };
 
     initializeExam();
-  }, [studentId, examName, totalQuestions, onExamStarted]);
+  }, [studentId, examName, totalQuestions]);
 
   // Setup proctoring monitoring
   useEffect(() => {

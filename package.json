@@ -2,12 +2,14 @@
   "name": "jobgeniee",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "studio": "prisma studio",
+    "seed": "node scripts/seed-coding-challenges.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {

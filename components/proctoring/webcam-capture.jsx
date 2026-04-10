@@ -7,10 +7,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { AlertCircle, Loader2, Camera } from "lucide-react";
 import { canvasToBase64, getWebcamStream } from "@/lib/proctoring-service";
 
-export default function WebcamCapture({ onCapture, isLoading = false, onStream }) {
+export default function WebcamCapture({
+  onCapture,
+  isLoading = false,
+  onStream,
+  minimal = false, // when true, render bare preview without text/chrome
+}) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
+  const streamRef = useRef(null);
   const [error, setError] = useState(null);
   const [capturedImage, setCapturedImage] = useState(null);
 
@@ -20,6 +26,7 @@ export default function WebcamCapture({ onCapture, isLoading = false, onStream }
         setError(null);
         const userStream = await getWebcamStream();
         setStream(userStream);
+        streamRef.current = userStream;
 
         // Notify parent of active stream so it can manage cleanup
         if (typeof onStream === "function") {
@@ -30,6 +37,7 @@ export default function WebcamCapture({ onCapture, isLoading = false, onStream }
           videoRef.current.srcObject = userStream;
         }
       } catch (err) {
+        console.error("Camera initialization error:", err);
         setError(err.message);
       }
     };
@@ -37,15 +45,39 @@ export default function WebcamCapture({ onCapture, isLoading = false, onStream }
     initWebcam();
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
+      const s = streamRef.current;
+      if (s) s.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
       // Clear parent stream reference on unmount
       if (typeof onStream === "function") {
         try { onStream(null); } catch (e) { /* ignore */ }
       }
     };
   }, []);
+
+  const handleRetryCamera = () => {
+    setError(null);
+    // Retry camera initialization
+    const initWebcam = async () => {
+      try {
+        const userStream = await getWebcamStream();
+        setStream(userStream);
+        streamRef.current = userStream;
+        
+        if (typeof onStream === "function") {
+          try { onStream(userStream); } catch (e) { /* ignore */ }
+        }
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = userStream;
+        }
+      } catch (err) {
+        console.error("Camera retry failed:", err);
+        setError(err.message);
+      }
+    };
+    initWebcam();
+  };
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -70,8 +102,36 @@ export default function WebcamCapture({ onCapture, isLoading = false, onStream }
             Camera Error
           </CardTitle>
           <CardDescription>{error}</CardDescription>
+          <CardDescription className="mt-2 text-sm">
+            💡 Make sure you've granted camera permissions to this site in your browser settings, then click retry.
+          </CardDescription>
         </CardHeader>
+        <CardContent>
+          <Button 
+            onClick={handleRetryCamera}
+            className="w-full"
+            variant="outline"
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Retry Camera Access
+          </Button>
+        </CardContent>
       </Card>
+    );
+  }
+
+  // Minimal overlay mode: just show live preview, no text/buttons
+  if (minimal) {
+    return (
+      <div className="w-full h-full">
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          className="w-full h-full object-cover"
+        />
+        <canvas ref={canvasRef} className="hidden" width={320} height={240} />
+      </div>
     );
   }
 

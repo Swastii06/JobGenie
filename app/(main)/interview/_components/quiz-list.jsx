@@ -28,7 +28,7 @@ export default function QuizList({ assessments }) {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="font-semibold text-lg">Recent Quizzes</h3>
+            <h3 className="font-semibold text-lg">Recent History</h3>
             <p className="text-sm text-muted-foreground">
               Review your past performance
             </p>
@@ -44,7 +44,10 @@ export default function QuizList({ assessments }) {
         
         {assessments && assessments.length > 0 ? (
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {assessments?.slice(0, 5).map((assessment, i) => (
+            {assessments?.slice(0, 5).map((assessment, i) => {
+              const typeLabel = assessment.source === "exam" ? "Custom Exam" : "Mock Quiz";
+
+              return (
               <Card
                 key={assessment.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -53,7 +56,9 @@ export default function QuizList({ assessments }) {
                 <CardContent className="pt-3 pb-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm">Quiz {i + 1}</p>
+                      <p className="font-medium text-sm">
+                        {typeLabel} {i + 1}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {format(
                           new Date(assessment.createdAt),
@@ -69,7 +74,7 @@ export default function QuizList({ assessments }) {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            );})}
           </div>
         ) : (
           <Card>

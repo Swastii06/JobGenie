@@ -60,22 +60,34 @@ export default function ExamResults({ examAttempt, onRetake }) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-slate-100">
+      {/* Results Header / Navigation */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold text-white">Custom Exam Results</h1>
+          <p className="text-sm text-slate-300">
+            Review your performance and return to interview preparation.
+          </p>
+        </div>
+        <Button variant="outline" className="border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-100" onClick={() => (window.location.href = "/interview")}>
+          Back to Interview Prep
+        </Button>
+      </div>
       {/* Score Card */}
-      <Card className={`${isPassing ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}`}>
+      <Card className={`${isPassing ? "border-emerald-900/50 bg-emerald-950/40" : "border-rose-900/50 bg-rose-950/40"}`}>
         <CardContent className="pt-8">
           <div className="text-center space-y-4">
             <div className="flex justify-center">
               {isPassing ? (
-                <CheckCircle2 className="w-16 h-16 text-green-600" />
+                <CheckCircle2 className="w-16 h-16 text-emerald-400" />
               ) : (
-                <XCircle className="w-16 h-16 text-red-600" />
+                <XCircle className="w-16 h-16 text-rose-400" />
               )}
             </div>
-            <h2 className={`text-3xl font-bold ${isPassing ? "text-green-600" : "text-red-600"}`}>
+            <h2 className={`text-3xl font-bold ${isPassing ? "text-emerald-300" : "text-rose-300"}`}>
               {isPassing ? "Congratulations!" : "Review Required"}
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-slate-300">
               {isPassing ? "You passed the exam!" : "You need to score higher to pass."}
             </p>
           </div>
@@ -84,46 +96,46 @@ export default function ExamResults({ examAttempt, onRetake }) {
 
       {/* Score Breakdown */}
       <div className="grid grid-cols-4 gap-4">
-        <Card>
+        <Card className="bg-slate-900/60 border-slate-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Score</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-300">Score</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalScore}</div>
-            <p className="text-xs text-muted-foreground">Total marks</p>
+            <div className="text-2xl font-bold text-white">{totalScore}</div>
+            <p className="text-xs text-slate-400">Total marks</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-slate-900/60 border-slate-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Percentage</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-300">Percentage</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{percentageScore}%</div>
+            <div className="text-2xl font-bold text-white">{percentageScore}%</div>
             <Progress value={percentageScore} className="mt-2 h-2" />
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-slate-900/60 border-slate-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Accuracy</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-300">Accuracy</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{Math.round((correctAnswers / totalQuestions) * 100)}%</div>
-            <p className="text-xs text-muted-foreground">{correctAnswers} of {totalQuestions}</p>
+            <div className="text-2xl font-bold text-white">{Math.round((correctAnswers / totalQuestions) * 100)}%</div>
+            <p className="text-xs text-slate-400">{correctAnswers} of {totalQuestions}</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-slate-900/60 border-slate-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+            <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-1">
               <Clock className="w-4 h-4" />
               Time Taken
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{minutes}:{seconds.toString().padStart(2, "0")}</div>
-            <p className="text-xs text-muted-foreground">Total duration</p>
+            <div className="text-2xl font-bold text-white">{minutes}:{seconds.toString().padStart(2, "0")}</div>
+            <p className="text-xs text-slate-400">Total duration</p>
           </CardContent>
         </Card>
       </div>
@@ -180,7 +192,7 @@ export default function ExamResults({ examAttempt, onRetake }) {
         )}
 
       {/* Detailed Analysis */}
-      <Card>
+      <Card className="bg-slate-900/60 border-slate-800">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5" />
@@ -192,7 +204,7 @@ export default function ExamResults({ examAttempt, onRetake }) {
           <div className="space-y-4">
             {questions.map((question, idx) => (
               <div key={question.questionId} className={`border-l-4 pl-4 py-3 rounded ${
-                question.isCorrect ? "border-l-green-500 bg-green-50" : "border-l-red-500 bg-red-50"
+                question.isCorrect ? "border-l-emerald-500 bg-emerald-950/30" : "border-l-rose-500 bg-rose-950/30"
               }`}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -203,53 +215,77 @@ export default function ExamResults({ examAttempt, onRetake }) {
                       <Badge variant="outline">
                         {question.questionType === "MCQ" && "Multiple Choice"}
                         {question.questionType === "CODING" && "Coding"}
+                        {question.questionType === "SQL" && "SQL"}
                         {question.questionType === "SUBJECTIVE" && "Subjective"}
                         {question.questionType === "FILL_BLANK" && "Fill Blank"}
                       </Badge>
-                      {question.questionType === "MCQ" || question.questionType === "FILL_BLANK" ? (
+                      {question.isCorrect !== undefined ? (
                         question.isCorrect ? (
-                          <Badge className="bg-green-100 text-green-900">✓ Correct</Badge>
+                          <Badge className="bg-emerald-900/50 text-emerald-200 border border-emerald-700">✓ Correct</Badge>
                         ) : (
-                          <Badge className="bg-red-100 text-red-900">✗ Incorrect</Badge>
+                          <Badge className="bg-rose-900/50 text-rose-200 border border-rose-700">✗ Incorrect</Badge>
                         )
                       ) : (
-                        <Badge className="bg-blue-100 text-blue-900">Pending Review</Badge>
+                        <Badge className="bg-blue-900/50 text-blue-200 border border-blue-700">Pending Review</Badge>
+                      )}
+                      {question.reviewedByAI && (
+                        <Badge className="bg-amber-900/50 text-amber-200 border border-amber-700 text-xs">AI Reviewed</Badge>
                       )}
                     </div>
                   </div>
                 </div>
 
                 {question.userAnswer && (
-                  <div className="mt-3 bg-white p-3 rounded text-sm border">
-                    <p className="font-semibold text-blue-900">Your Answer:</p>
-                    <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
+                  <div className="mt-3 bg-slate-900 p-3 rounded text-sm border border-slate-700">
+                    <p className="font-semibold text-blue-300">Your Answer:</p>
+                    <p className="text-slate-300 mt-1 whitespace-pre-wrap">
                       {question.userAnswer.substring(0, 200)}{question.userAnswer.length > 200 ? "..." : ""}
                     </p>
                   </div>
                 )}
 
                 {question.correctAnswer && question.questionType !== "SUBJECTIVE" && (
-                  <div className="mt-2 bg-white p-3 rounded text-sm border">
-                    <p className="font-semibold text-green-900">Correct Answer:</p>
-                    <p className="text-muted-foreground mt-1">{question.correctAnswer}</p>
+                  <div className="mt-2 bg-slate-900 p-3 rounded text-sm border border-slate-700">
+                    <p className="font-semibold text-emerald-300">Correct Answer:</p>
+                    <p className="text-slate-300 mt-1">{question.correctAnswer}</p>
                   </div>
                 )}
 
                 {question.explanation && (
-                  <div className="mt-2 bg-blue-50 p-3 rounded text-sm border-l-2 border-blue-500">
-                    <p className="font-semibold text-blue-900">💡 Explanation:</p>
-                    <p className="text-blue-800 mt-1">{question.explanation}</p>
+                  <div className="mt-2 bg-blue-950/30 p-3 rounded text-sm border-l-2 border-blue-500">
+                    <p className="font-semibold text-blue-300">💡 Explanation:</p>
+                    <p className="text-blue-200 mt-1">{question.explanation}</p>
                   </div>
                 )}
 
-                {question.solution && (
+                {question.reviewedByAI && question.reviewFeedback && (
+                  <div className={`mt-2 p-3 rounded text-sm border-l-2 ${
+                    question.isCorrect 
+                      ? "bg-emerald-950/30 border-emerald-500" 
+                      : "bg-rose-950/30 border-rose-500"
+                  }`}>
+                    <p className={`font-semibold ${question.isCorrect ? "text-emerald-300" : "text-rose-300"}`}>
+                      🤖 AI Review Feedback:
+                    </p>
+                    <p className={`mt-1 ${question.isCorrect ? "text-emerald-200" : "text-rose-200"}`}>
+                      {question.reviewFeedback}
+                    </p>
+                    {question.score !== undefined && (
+                      <p className={`mt-2 font-semibold ${question.isCorrect ? "text-emerald-300" : "text-rose-300"}`}>
+                        Score: {question.score}/100
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {question.solution && question.solution !== "Pending manual review" && (
                   <div className="mt-2">
                     <button
                       onClick={() => setShowSolutions(prev => ({
                         ...prev,
                         [question.questionId]: !prev[question.questionId]
                       }))}
-                      className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-semibold"
+                      className="flex items-center gap-2 text-sm text-blue-300 hover:text-blue-200 font-semibold"
                     >
                       {showSolutions[question.questionId] ? (
                         <EyeOff className="w-4 h-4" />

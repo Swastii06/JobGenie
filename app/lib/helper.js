@@ -6,6 +6,14 @@ function formatDateRange(startDate, endDate, current, location) {
   return location ? `${dateStr} | ${location}` : dateStr;
 }
 
+function toBullets(description = "") {
+  return String(description)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `- ${line}`);
+}
+
 // Helper function to format education entries (ATS-friendly)
 export function formatEducationMarkdown(entries) {
   if (!entries?.length) return "";
@@ -20,20 +28,8 @@ export function formatEducationMarkdown(entries) {
           entry.current,
           entry.location
         );
-        const lines = [
-          `**${entry.organization}**`,
-          `${entry.title}`,
-        ];
-        // Add right-aligned date/location info
-        lines.push(`<div align="right">${dateRange}</div>`);
-        if (entry.description) {
-          // Split description by newlines for bullet points
-          const bullets = entry.description
-            .split("\n")
-            .filter((line) => line.trim())
-            .map((line) => `*   ${line.trim()}`);
-          lines.push(...bullets);
-        }
+        const lines = [`**${entry.organization}**`, `${entry.title} | ${dateRange}`];
+        lines.push(...toBullets(entry.description));
         return lines.join("\n");
       })
       .join("\n\n")
@@ -54,18 +50,8 @@ export function formatExperienceMarkdown(entries) {
           entry.current,
           entry.location
         );
-        const lines = [
-          `**${entry.organization}**`,
-          `${entry.title}`,
-        ];
-        // Add right-aligned date/location info
-        lines.push(`<div align="right">${dateRange}</div>`);
-        // Split description by newlines for bullet points
-        const bullets = entry.description
-          .split("\n")
-          .filter((line) => line.trim())
-          .map((line) => `*   ${line.trim()}`);
-        lines.push(...bullets);
+        const lines = [`**${entry.organization}**`, `${entry.title} | ${dateRange}`];
+        lines.push(...toBullets(entry.description));
         return lines.join("\n");
       })
       .join("\n\n")
@@ -80,19 +66,11 @@ export function formatProjectsMarkdown(entries) {
     `## PROJECTS AND HACKATHONS\n\n` +
     entries
       .map((entry) => {
-        const lines = [`**${entry.title}**`];
+        const lines = [entry.link ? `**${entry.title}** | [Link](${entry.link})` : `**${entry.title}**`];
         if (entry.technologies) {
-          lines.push(`Technologies: \`${entry.technologies}\``);
+          lines.push(`*${entry.technologies}*`);
         }
-        if (entry.link) {
-          lines.push(`<div align="right">[Link](${entry.link})</div>`);
-        }
-        // Split description by newlines for bullet points
-        const bullets = entry.description
-          .split("\n")
-          .filter((line) => line.trim())
-          .map((line) => `*   ${line.trim()}`);
-        lines.push(...bullets);
+        lines.push(...toBullets(entry.description));
         return lines.join("\n");
       })
       .join("\n\n")

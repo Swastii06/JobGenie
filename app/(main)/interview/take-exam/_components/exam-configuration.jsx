@@ -12,14 +12,41 @@ import { AlertCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 const INDUSTRIES = [
+  // Technology
   { value: "tech-software", label: "Technology - Software Development" },
   { value: "tech-web", label: "Technology - Web Development" },
   { value: "tech-data", label: "Technology - Data Science" },
-  { value: "finance-banking", label: "Finance - Banking" },
+  { value: "tech-devops", label: "Technology - DevOps/Cloud Infrastructure" },
+  { value: "tech-ai", label: "Technology - AI/Machine Learning" },
+  { value: "tech-mobile", label: "Technology - Mobile Development" },
+  { value: "tech-cloud", label: "Technology - Cloud Computing" },
+  { value: "tech-security", label: "Technology - Cybersecurity" },
+  { value: "tech-database", label: "Technology - Database Administration" },
+  
+  // Finance & Accounting
+  { value: "finance-banking", label: "Finance - Banking & Corporate Finance" },
   { value: "finance-accounting", label: "Finance - Accounting" },
-  { value: "marketing", label: "Marketing" },
-  { value: "sales", label: "Sales" },
-  { value: "hr", label: "Human Resources" },
+  { value: "finance-investment", label: "Finance - Investment & Trading" },
+  { value: "finance-insurance", label: "Finance - Insurance" },
+  
+  // Business & Management
+  { value: "marketing", label: "Marketing & Digital Marketing" },
+  { value: "sales", label: "Sales & Business Development" },
+  { value: "product", label: "Product Management" },
+  { value: "management", label: "Management & Leadership" },
+  { value: "consulting", label: "Management Consulting" },
+  { value: "strategy", label: "Strategic Planning" },
+  
+  // Other Professions
+  { value: "hr", label: "Human Resources & Talent Management" },
+  { value: "design", label: "UX/UI Design & Product Design" },
+  { value: "legal", label: "Legal & Compliance" },
+  { value: "supplier", label: "Supply Chain & Procurement" },
+  { value: "operations", label: "Operations Management" },
+  { value: "healthcare", label: "Healthcare Administration" },
+  { value: "education", label: "Education & Training" },
+  { value: "media", label: "Media & Content" },
+  { value: "ecommerce", label: "E-commerce & Retail" },
 ];
 
 const DIFFICULTIES = [
@@ -28,20 +55,24 @@ const DIFFICULTIES = [
   { value: "hard", label: "Hard", color: "red" },
 ];
 
-export default function ExamConfiguration({ onStartExam, userIndustry }) {
+export default function ExamConfiguration({ onStartExam, userIndustry, isGenerating = false }) {
   const [selectedIndustry, setSelectedIndustry] = useState(userIndustry || "");
   const [selectedDifficulty, setSelectedDifficulty] = useState("medium");
+  const [preferredLanguage, setPreferredLanguage] = useState("python");
+  const [preferredSqlDialect, setPreferredSqlDialect] = useState("postgresql");
   
   const [questionCounts, setQuestionCounts] = useState({
-    mcq: 5,
+    mcq: 3,
     coding: 2,
-    subjective: 2,
-    fillBlank: 1,
+    sql: 1,
+    subjective: 1,
+    fillBlank: 0,
   });
 
   const [customQuestions, setCustomQuestions] = useState({
     mcq: false,
     coding: false,
+    sql: false,
     subjective: false,
     fillBlank: false,
   });
@@ -80,6 +111,8 @@ export default function ExamConfiguration({ onStartExam, userIndustry }) {
     const config = {
       industry: selectedIndustry,
       difficulty: selectedDifficulty,
+      preferredLanguage,
+      preferredSqlDialect,
       questionCounts,
       totalQuestions,
       duration,
@@ -127,18 +160,80 @@ export default function ExamConfiguration({ onStartExam, userIndustry }) {
           <CardContent>
             <RadioGroup value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
               <div className="grid grid-cols-3 gap-4">
-                {DIFFICULTIES.map(diff => (
-                  <div key={diff.value} className="flex items-center space-x-2">
-                    <RadioGroupItem value={diff.value} id={`diff-${diff.value}`} />
-                    <Label htmlFor={`diff-${diff.value}`} className="cursor-pointer">
-                      <span className={`px-2 py-1 rounded text-sm font-medium bg-${diff.color}-100 text-${diff.color}-800`}>
-                        {diff.label}
-                      </span>
-                    </Label>
-                  </div>
-                ))}
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="easy" id="diff-easy" />
+                  <Label htmlFor="diff-easy" className="cursor-pointer">
+                    <span className="px-3 py-1 rounded-md text-sm font-semibold bg-green-600 dark:bg-green-700 text-white hover:bg-green-700 dark:hover:bg-green-800 transition-colors">
+                      Easy
+                    </span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="medium" id="diff-medium" />
+                  <Label htmlFor="diff-medium" className="cursor-pointer">
+                    <span className="px-3 py-1 rounded-md text-sm font-semibold bg-amber-500 dark:bg-amber-600 text-white hover:bg-amber-600 dark:hover:bg-amber-700 transition-colors">
+                      Medium
+                    </span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="hard" id="diff-hard" />
+                  <Label htmlFor="diff-hard" className="cursor-pointer">
+                    <span className="px-3 py-1 rounded-md text-sm font-semibold bg-red-600 dark:bg-red-700 text-white hover:bg-red-700 dark:hover:bg-red-800 transition-colors">
+                      Hard
+                    </span>
+                  </Label>
+                </div>
               </div>
             </RadioGroup>
+          </CardContent>
+        </Card>
+
+        {/* Language Preference */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Preferred Coding Language</CardTitle>
+            <CardDescription>Choose the language for coding questions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={preferredLanguage} onValueChange={setPreferredLanguage}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a language" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="python">Python</SelectItem>
+                <SelectItem value="javascript">JavaScript</SelectItem>
+                <SelectItem value="java">Java</SelectItem>
+                <SelectItem value="cpp">C++</SelectItem>
+                <SelectItem value="c">C</SelectItem>
+                <SelectItem value="csharp">C#</SelectItem>
+                <SelectItem value="go">Go</SelectItem>
+                <SelectItem value="rust">Rust</SelectItem>
+                <SelectItem value="typescript">TypeScript</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {/* SQL Dialect Preference */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Preferred SQL Dialect</CardTitle>
+            <CardDescription>Used for SQL questions (MySQL/PostgreSQL/etc.)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={preferredSqlDialect} onValueChange={setPreferredSqlDialect}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select SQL dialect" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="postgresql">PostgreSQL</SelectItem>
+                <SelectItem value="mysql">MySQL</SelectItem>
+                <SelectItem value="sqlite">SQLite</SelectItem>
+                <SelectItem value="sqlserver">SQL Server</SelectItem>
+                <SelectItem value="oracle">Oracle SQL</SelectItem>
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
 
@@ -210,6 +305,40 @@ export default function ExamConfiguration({ onStartExam, userIndustry }) {
                   max="10"
                   value={questionCounts.coding}
                   onChange={(e) => handleQuestionCountChange("coding", e.target.value)}
+                  className="w-16"
+                />
+              )}
+            </div>
+
+            {/* Subjective */}
+            {/* SQL */}
+            <div className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="sql"
+                  checked={questionCounts.sql > 0}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      handleQuestionCountChange("sql", 1);
+                    } else {
+                      handleQuestionCountChange("sql", 0);
+                    }
+                  }}
+                />
+                <Label htmlFor="sql" className="cursor-pointer">
+                  <div>
+                    <p className="font-semibold">SQL Questions</p>
+                    <p className="text-sm text-muted-foreground">Write SQL queries (dialect specific)</p>
+                  </div>
+                </Label>
+              </div>
+              {questionCounts.sql > 0 && (
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={questionCounts.sql}
+                  onChange={(e) => handleQuestionCountChange("sql", e.target.value)}
                   className="w-16"
                 />
               )}
@@ -367,6 +496,12 @@ export default function ExamConfiguration({ onStartExam, userIndustry }) {
                 <span className="font-medium">{questionCounts.coding}</span>
               </div>
             )}
+            {questionCounts.sql > 0 && (
+              <div className="flex justify-between text-sm">
+                <span>SQL</span>
+                <span className="font-medium">{questionCounts.sql}</span>
+              </div>
+            )}
             {questionCounts.subjective > 0 && (
               <div className="flex justify-between text-sm">
                 <span>Subjective</span>
@@ -391,13 +526,18 @@ export default function ExamConfiguration({ onStartExam, userIndustry }) {
             <p className="font-semibold">{enableProctoring ? "Enabled" : "Disabled"}</p>
           </div>
 
+          <div>
+            <p className="text-sm text-muted-foreground">SQL Dialect</p>
+            <p className="font-semibold capitalize">{preferredSqlDialect}</p>
+          </div>
+
           <Button 
             onClick={handleStartExam}
             className="w-full mt-4"
             size="lg"
-            disabled={!selectedIndustry || totalQuestions === 0}
+            disabled={!selectedIndustry || totalQuestions === 0 || isGenerating}
           >
-            Start Exam
+            {isGenerating ? "Generating Questions..." : "Start Exam"}
           </Button>
         </CardContent>
       </Card>
