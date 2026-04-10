@@ -9,6 +9,9 @@ import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+// Force dynamic rendering - prevent static generation with Clerk headers
+export const dynamic = 'force-dynamic';
+
 export default function StatsPage() {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
