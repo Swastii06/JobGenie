@@ -6,6 +6,9 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+// Force dynamic rendering - don't attempt static generation at build time
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: "Coding Challenges",
   description: "Solve coding problems and improve your programming skills",

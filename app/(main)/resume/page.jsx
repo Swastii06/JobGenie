@@ -1,6 +1,9 @@
 import { getResume } from "@/actions/resume";
 import ResumeBuilder from "./_components/resume-builder";
 
+// Force dynamic rendering - don't attempt static generation at build time
+export const dynamic = 'force-dynamic';
+
 export default async function ResumePage() {
   const resume = await getResume();
 

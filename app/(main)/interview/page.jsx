@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
+// Force dynamic rendering - don't attempt static generation at build time
+export const dynamic = 'force-dynamic';
+
 export default async function InterviewPrepPage() {
   const assessments = await getAssessments();
 

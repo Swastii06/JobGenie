@@ -131,9 +131,15 @@ export async function getCodingChallenges(filters = {}) {
       },
     });
 
-    return challenges;
+    return challenges || [];
   } catch (error) {
-    console.error("Error fetching challenges:", error);
+    console.error("Error fetching challenges:", {
+      message: error.message,
+      code: error.code,
+      clientVersion: error.clientVersion,
+      stack: error.stack,
+    });
+    // Return empty array instead of throwing to prevent route crashes
     return [];
   }
 }
