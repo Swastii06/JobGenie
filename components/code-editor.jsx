@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -87,13 +87,9 @@ export default function CodeEditor({
   isRunning = false,
   testResults = null,
 }) {
-  // Ensure codeTemplates is parsed if it's a string
   const getCodeTemplates = () => {
     if (!challenge?.codeTemplates) return {};
-    
     let templates = challenge.codeTemplates;
-    
-    // If it's a string, try to parse it as JSON
     if (typeof templates === "string") {
       try {
         templates = JSON.parse(templates);
@@ -102,23 +98,19 @@ export default function CodeEditor({
         return {};
       }
     }
-    
     return templates || {};
   };
 
   const templates = getCodeTemplates();
-  
-  console.log("CodeEditor props - challenge:", challenge);
-  console.log("CodeEditor props - initialCode:", initialCode);
-  console.log("CodeEditor props - codeTemplates (parsed):", templates);
 
+  // FIXED: Removed the duplicate [language, setLanguage] declaration
   const [language, setLanguage] = useState("python");
   const [showHints, setShowHints] = useState(false);
   const [showCorrectSolution, setShowCorrectSolution] = useState(false);
 
-  const [language, setLanguage] = useState("python");
   const parsedSolutions = parseJsonIfString(challenge?.solutions);
   const correctSolution = parsedSolutions?.[language] || null;
+  
   const hasFailedTestResults =
     testResults &&
     (testResults.success === false ||
@@ -161,7 +153,6 @@ export default function CodeEditor({
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
     setShowHints(false);
-    // Update code template when language changes
     setCode(extractHintsFromTemplate(getTemplateForLanguage(newLanguage)).code);
   };
 
@@ -183,7 +174,6 @@ export default function CodeEditor({
 
   return (
     <div className="space-y-4">
-
       {/* Editor Header */}
       <Card className="border-0 bg-slate-900 text-white">
         <CardHeader className="pb-3">
@@ -244,7 +234,6 @@ export default function CodeEditor({
             fontFamily: "'Courier New', monospace",
             padding: { top: 16, bottom: 16 },
             bracketPairColorization: true,
-            "bracketPairColorization.independentColorPoolPerBracketType": true,
             smoothScrolling: true,
             cursorBlinking: "blink",
             formatOnPaste: true,
