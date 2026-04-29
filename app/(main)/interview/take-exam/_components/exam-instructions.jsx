@@ -28,6 +28,11 @@ export default function ExamInstructions({ onProceedToExam, examConfig, isGenera
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          try {
+            await videoRef.current.play();
+          } catch (playErr) {
+            console.warn("Video playback failed:", playErr);
+          }
         }
         setCameraReady(true);
         toast.success("📷 Camera ready! You can proceed when ready.");
@@ -68,6 +73,11 @@ export default function ExamInstructions({ onProceedToExam, examConfig, isGenera
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.warn("Video playback failed:", playErr);
+        }
       }
       setCameraReady(true);
       toast.success("📷 Camera ready!");

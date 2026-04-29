@@ -52,6 +52,33 @@ function extractHintsFromTemplate(template) {
   return { code: kept.join("\n") + "\n", hints };
 }
 
+function parseJsonIfString(value) {
+  if (!value) return null;
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch (e) {
+      return null;
+    }
+  }
+  return value;
+}
+
+function isStarterTemplate(template) {
+  if (typeof template !== "string" || !template.trim()) {
+    return false;
+  }
+
+  const normalized = template.toLowerCase();
+  const containsPlaceholder = /todo|hint|write your code here|your solution here|solve the problem/i.test(normalized);
+  if (containsPlaceholder) {
+    return true;
+  }
+
+  const containsCompleteSolutionPatterns = /return\s+|console\.log\(|system\.out\.println\(|std::|print\(|puts\(|cout<<|\bif\s*\(|\bfor\s*\(|\bwhile\s*\(/i;
+  return !containsCompleteSolutionPatterns.test(template);
+}
+
 export default function CodeEditor({
   challenge,
   onSubmit,
@@ -85,11 +112,23 @@ export default function CodeEditor({
   console.log("CodeEditor props - initialCode:", initialCode);
   console.log("CodeEditor props - codeTemplates (parsed):", templates);
 
+  const [language, setLanguage] = useState("python");
   const [showHints, setShowHints] = useState(false);
+  const [showCorrectSolution, setShowCorrectSolution] = useState(false);
+
+  const [language, setLanguage] = useState("python");
+  const parsedSolutions = parseJsonIfString(challenge?.solutions);
+  const correctSolution = parsedSolutions?.[language] || null;
+  const hasFailedTestResults =
+    testResults &&
+    (testResults.success === false ||
+      (typeof testResults.passedTests === "number" &&
+        typeof testResults.totalTests === "number" &&
+        testResults.passedTests < testResults.totalTests));
 
   const getTemplateForLanguage = (lang) => {
     const fromDb = templates?.[lang];
-    if (fromDb) return fromDb;
+    if (fromDb && isStarterTemplate(fromDb)) return fromDb;
 
     const fallbackTemplates = {
       python: "# Write your code here\n",
@@ -105,12 +144,19 @@ export default function CodeEditor({
 
     return fallbackTemplates[lang] || `// ${lang} template not available\n`;
   };
+
+  const [code, setCode] = useState(() => {
+    const template = initialCode || getTemplateForLanguage("python");
+    const normalizedValue = typeof template === "string" ? template.trim() : "";
+
+    if (normalizedValue && isStarterTemplate(normalizedValue)) {
+      return extractHintsFromTemplate(normalizedValue).code;
+    }
+
+    return extractHintsFromTemplate(getTemplateForLanguage("python")).code;
+  });
+
   const templateMeta = extractHintsFromTemplate(getTemplateForLanguage(language));
-  
-  const [code, setCode] = useState(
-    initialCode || extractHintsFromTemplate(getTemplateForLanguage("python")).code
-  );
-  const [language, setLanguage] = useState("python");
 
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
@@ -245,6 +291,35 @@ export default function CodeEditor({
         >
           {isRunning ? "Submitting..." : "Submit Solution"}
         </Button>
+      )}
+
+      {hasFailedTestResults && correctSolution && (
+        <div className="space-y-3 mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowCorrectSolution((prev) => !prev)}
+          >
+            {showCorrectSolution ? "Hide Correct Solution" : "Show Correct Solution"}
+          </Button>
+
+          {showCorrectSolution && (
+            <Card className="bg-slate-950 border border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-sm text-white">Correct Solution</CardTitle>
+                <CardDescription className="text-slate-400">
+                  This solution is shown because your latest test run did not pass all cases.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <pre className="whitespace-pre-wrap text-xs bg-slate-900 p-4 rounded-lg overflow-auto text-slate-100">
+                  {correctSolution}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       {isRunning && <BarLoader color="gray" width="100%" />}
